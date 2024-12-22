@@ -96,14 +96,6 @@ async def join(ctx):
     elif len(players) >= 8:
         await ctx.send("The game is full. Only 5 to 8 players can join!")
     else:
-        # TODO: remove these
-        players.append(ctx.author)
-        players.append(ctx.author)
-        players.append(ctx.author)
-        players.append(ctx.author)
-        players.append(ctx.author)
-        players.append(ctx.author)
-        players.append(ctx.author)
         players.append(ctx.author)
         await ctx.send(f"{ctx.author.name} has joined the game! ({len(players)}/8 players)")
 
@@ -207,10 +199,9 @@ async def nominate(ctx, nomination: str):
         await ctx.send("Could not find that player, try again.")
         return
     
-    # TODO: UNCOMMENT THIS AFTER TESTING IS DONE
-    # if chancellor == previous_president:
-    #     await ctx.send("You can't nominate the most recent President as Chancellor, nominate a different Chancellor.")
-    #     return
+    if chancellor == previous_president:
+        await ctx.send("You can't nominate the most recent President as Chancellor, nominate a different Chancellor.")
+        return
     
     current_chancellor = chancellor
     await ctx.send(f"President {current_president.name} has nominated {chancellor.name} as Chancellor, time to cast your votes!")
@@ -497,10 +488,9 @@ async def appoint(ctx, appointed_name: str):
         await ctx.send("Could not find that player, try again.")
         return
     
-    # TODO: uncomment this
-    # if appointed_president == current_president:
-    #     await ctx.send("You can't appoint yourself, choose somebody else.")
-    #     return
+    if appointed_president == current_president:
+        await ctx.send("You can't appoint yourself, choose somebody else.")
+        return
     
     previous_president = current_president
     current_president = appointed_president
