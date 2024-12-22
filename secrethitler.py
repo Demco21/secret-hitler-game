@@ -12,11 +12,6 @@ load_dotenv()
 # Environment variables
 ENV_TOKEN_SUFFIX = os.getenv('ENV')
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN' + ENV_TOKEN_SUFFIX)
-AFK_CHANNEL_ID = int(os.getenv('AFK_CHANNEL_ID'))
-HOGBOT_CHANNEL_ID = int(os.getenv('HOGBOT_CHANNEL_ID'))
-HOGBOT_USER_ID = int(os.getenv('HOGBOT_USER_ID'))
-CHANCELLOR_ROLE_ID = int(os.getenv('CHANCELLOR_ROLE_ID'))
-HOGBOT_SERVER_ID = int(os.getenv('HOGBOT_SERVER_ID'))
 
 # Set up logging
 logger = logging.getLogger(__name__)
