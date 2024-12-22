@@ -35,11 +35,11 @@ sudo su
 ```
 2. Run the bot in the background use nohup (recommended)
 ```shell
-nohup python3 -u hogbot.py &
+nohup python3 -u secrethitler.py &
 ```
 3. You can also run the bot directly using python3 (optional)
 ```shell
-python3 hogbot.py
+python3 secrethitler.py
 ```
 4. Check the log output
 ```shell
