@@ -73,6 +73,13 @@ AGENDA_VETOED = 8
 async def on_ready():
     print(f"Logged in as {bot.user}")
 
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.CheckFailure):
+        logger.info(f"User {ctx.author.name} is not allowed to use this command. Please make sure you meet the requirements.")
+    else:
+        raise error
+
 def is_player():
     """Checks if the user is a player."""
     async def predicate(ctx):
@@ -101,16 +108,28 @@ async def join(ctx):
 
 @bot.command()
 @is_player()
+async def leave(ctx):
+    """Leave a lobby."""
+    global players
+    if game_state == GAME_NOT_STARTED:
+        players.remove(ctx.author)
+        message = (f"**{ctx.author.name}** has left the lobby. ({len(players)}/8 players)")
+        await ctx.send(message)
+    else:
+        await ctx.send("Match is in progress.")
+
+@bot.command()
+@is_player()
 async def start(ctx):
     """Starts the game if enough players have joined."""
-    global roles, role_assignments, policy_cards, game_state, current_president
+    global roles, role_assignments, policy_cards, game_state, current_president, players
 
     if len(players) < 5:
-        await ctx.send("You need at least 5 players to start the game!")
+        await ctx.send(f"You need at least 5 players to start the game! ({len(players)}/8 players)")
         return
 
     if len(players) > 8:
-        await ctx.send("The game can only have a maximum of 8 players!")
+        await ctx.send(f"The game can only have a maximum of 8 players! ({len(players)}/8 players)")
         return
     
     if game_state != GAME_NOT_STARTED:
@@ -600,18 +619,19 @@ async def veto(ctx, decision: str=None):
         return
     
 @bot.command()
-@is_player()
-async def roles(ctx):
-    """Displays the role distribution (not assignments)."""
-    if not game_started:
-        await ctx.send("The game hasn't started yet.")
-        return
-
-    num_fascists = roles.count(FASCIST)
-    num_liberals = roles.count(LIBERAL)
-    num_hitlers = roles.count(HITLER)
-
-    await ctx.send(f"Role distribution: {num_liberals} Liberals, {num_fascists} Fascists, 1 Hitler.")
+async def lobby(ctx):
+    """Displays the members in the lobby."""
+    global players
+    if game_state == GAME_NOT_STARTED:
+        if players:
+            message = (f"**Players waiting in lobby:**")
+            for player in players:
+                message += (f"\n- {player.name}")
+        else:
+            message = "No players are currently in the lobby."
+        await ctx.send(message)
+    else:
+        await ctx.send("Match is in progress.")
 
 @bot.command()
 @is_player()
