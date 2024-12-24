@@ -21,6 +21,10 @@ create a file named `.env` and add the following keys:<br>
 2. `DISCORD_TOKEN_DEV=` value of your dev discord token<br>
 3. `DISCORD_TOKEN_PROD=` value of your prod discord token<br>
 4. `SECRET_HITLER_CHANNEL_ID=` Channel ID you want the bot to use<br>
+5. `FASCIST_CARD_EMOJI_NAME=` Name of the Fascist card emoji<br>
+6. `LIBERAL_CARD_EMOJI_NAME=` Name of the Liberal card emoji<br>
+7. `FASCIST_CARD_EMOJI_ID=` ID of the Fascist card emoji<br>
+8. `LIBERAL_CARD_EMOJI_ID=` ID of the Liberal card emoji<br>
 
 ## Running the bot
 ### Run the bot locally

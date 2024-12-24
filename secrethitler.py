@@ -14,6 +14,10 @@ load_dotenv()
 ENV_TOKEN_SUFFIX = os.getenv('ENV')
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN' + ENV_TOKEN_SUFFIX)
 SECRET_HITLER_CHANNEL_ID = int(os.getenv('SECRET_HITLER_CHANNEL_ID'))
+FASCIST_CARD_EMOJI_NAME = os.getenv('FASCIST_CARD_EMOJI_NAME')
+LIBERAL_CARD_EMOJI_NAME = os.getenv('LIBERAL_CARD_EMOJI_NAME')
+FASCIST_CARD_EMOJI_ID = int(os.getenv('FASCIST_CARD_EMOJI_ID'))
+LIBERAL_CARD_EMOJI_ID = int(os.getenv('LIBERAL_CARD_EMOJI_ID'))
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -181,7 +185,7 @@ async def ready(ctx):
 @is_game_channel()
 async def start(ctx):
     """Starts the game after ready."""
-    global roles, role_assignments, policy_cards, game_state, current_president, players
+    global roles, role_assignments, policy_cards, game_state, current_president, players, game_type
 
     if len(players) < 5:
         await ctx.send(f"You need at least 5 players to start the game! ({len(players)}/8 players)")
@@ -199,7 +203,8 @@ async def start(ctx):
         await ctx.send("The game has already started!")
         return
 
-    await ctx.send("The game has started! Assigning roles...")
+    await ctx.send(f"The game has started in {game_type} mode with {len(players)} players! Assigning roles...")
+    logger.info(f"Starting game with {len(players)} players in {game_type} mode.")
 
     # Assign roles
     num_players = len(players)
@@ -209,9 +214,8 @@ async def start(ctx):
     roles = [HITLER] + [FASCIST] * num_fascists + [LIBERAL] * num_liberals
     random.shuffle(roles)
     
-    logger.info(f"players: {players}")
     role_assignments = {player: role for player, role in zip(players, roles)}
-    logger.info(f"Role Assignments: {role_assignments}")
+    logger.info("Players: [%s]", ", ".join(f"{player.name} ({player.id}) ({role})" for player, role in role_assignments.items()))
 
     # Create the stack of policy cards
     policy_cards = [LIBERAL] * 6 + [FASCIST] * 11
@@ -717,12 +721,10 @@ async def print_game_dashboard(ctx, msgBefore=None, msgAfter=None):
     for player in assassinated:
         message += f"\n- {player.name} (Assassinated)"
     message += (
-        f"\n\n**Policy Deck <:liberal_card:1320572752079360121><:fascist_card:1320572728054648903>**"
+        f"\n\n**Policy Deck <:{LIBERAL_CARD_EMOJI_NAME}:{LIBERAL_CARD_EMOJI_ID}><:{FASCIST_CARD_EMOJI_NAME}:{FASCIST_CARD_EMOJI_ID}>**"
         f"\n- Draw Pile: {len(policy_cards)} Cards"
         f"\n- Discard Pile: {len(discarded_policies)}"
         )
-    logger.info(get_liberal_board_img_file())
-    logger.info(get_fascist_board_img_file())
     if msgBefore:
         await ctx.send(msgBefore)
     await ctx.send(message)
@@ -876,6 +878,7 @@ async def game_over(ctx, msg):
     
     msg += f"\n\n**LIBERALS:**\n" + "\n".join(f"- {liberal.name} (assassinated)" if liberal in assassinated else f"- {liberal.name}" for liberal in liberals)
     
+    logger.info(f"Ending Game: {msg}")
     await ctx.send(msg)
     reset_game()
 
