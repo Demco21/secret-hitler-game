@@ -203,17 +203,15 @@ async def start(ctx):
         await ctx.send("The game has already started!")
         return
 
-    await ctx.send(f"The game has started in {game_type} mode with {len(players)} players! Assigning roles...")
-    logger.info(f"Starting game with {len(players)} players in {game_type} mode.")
-
-    # Assign roles
     num_players = len(players)
     num_fascists = {5: 1, 6: 1, 7: 2, 8: 2}[num_players]
     num_liberals = num_players - num_fascists - 1
 
+    logger.info(f"Starting game with {num_players} players in {game_type} mode.")
+
     roles = [HITLER] + [FASCIST] * num_fascists + [LIBERAL] * num_liberals
     random.shuffle(roles)
-    
+    # Assign roles    
     role_assignments = {player: role for player, role in zip(players, roles)}
     logger.info("Players: [%s]", ", ".join(f"{player.name} ({player.id}) ({role})" for player, role in role_assignments.items()))
 
@@ -224,17 +222,12 @@ async def start(ctx):
     # Randomly select a candidate
     candidate = random.choice(players)
     current_president = candidate
-    messageBefore = (
-        f"\n\n**Game Details:**"
-        f"\n- Fascists: {num_fascists + 1}"
-        f"\n- Liberals: {num_liberals}"
-        "\n- One Fascist is Hitler!"
-        )
     messageAfter = (
+        f"The game has started! There will be {num_liberals} Liberals and {num_fascists} Fascists with 1 Secret Hitler."
         f"Your first Presidential Candidate has been randomly selected as **{candidate.name}**!"
-        f"\n**{candidate.name}** you must **!nominate** a Chancellor then the group will vote."
+        f"\n**{candidate.name}** you must **!nominate** a Chancellor then the group will **!vote**."
         )
-    await print_game_dashboard(ctx, messageBefore, messageAfter)
+    await print_game_dashboard(ctx, None, messageAfter)
     await send_roles_to_players()
     game_state = NOMINATE_CHANCELLOR
 
@@ -327,7 +320,7 @@ async def vote(ctx, vote: str):
             policy_cards = policy_cards[min(3, len(policy_cards)):]
             message += (
                 f"\nThe election was successful! The candidate is elected!"
-                f"\n\nWaiting for your new President **{current_president.name}** to discard one policy before your Chancellor **{current_chancellor.name}** will enact one."
+                f"\n\nWaiting for your new President **{current_president.name}** to **!discard** one policy before your Chancellor **{current_chancellor.name}** will **!enact** one."
                 )
             await print_game_dashboard(ctx, None, message)
             president_message = (
@@ -353,7 +346,7 @@ async def vote(ctx, vote: str):
             message = (
                 f"The election failed! The candidate was not elected. {enact_top_policy_msg}"
                 f"\n**{current_president.name}** has been chosen as the new Presidential Candidate."
-                f"\n**{current_president.name}** you must **!nominate** a Chancellor then the group will re-vote."
+                f"\n**{current_president.name}** you must **!nominate** a Chancellor then the group will **!vote** again."
                 )
             await print_game_dashboard(ctx, None, message)
             game_state = NOMINATE_CHANCELLOR
@@ -491,7 +484,7 @@ async def enact(ctx, card: str):
     current_president = next_president
     message += (
         f"\nIt's time for a new election! **{next_president.name}** will be nominated as new President!"
-        f"\n**{next_president.name}** you must **!nominate** a Chancellor then the group will vote."
+        f"\n**{next_president.name}** you must **!nominate** a Chancellor then the group will **!vote**."
     )
     await print_game_dashboard(ctx, None, message)
     game_state = NOMINATE_CHANCELLOR
@@ -531,7 +524,7 @@ async def investigate(ctx, suspect_name: str):
         messageAfter += f"\n\n{reshuffle_msg}"
     messageAfter = (
         f"\n\n It's time for a new election! **{next_president.name}** will be nominated as new President!"
-        f"\n**{next_president.name}** you must **!nominate** a Chancellor then the group will vote."
+        f"\n**{next_president.name}** you must **!nominate** a Chancellor then the group will **!vote**."
     )
     await print_game_dashboard(ctx, None, messageAfter)
     game_state = NOMINATE_CHANCELLOR
@@ -569,7 +562,7 @@ async def appoint(ctx, appointed_name: str):
         messageAfter += f"\n\n{reshuffle_msg}"
     messageAfter += (
         f"\n\n It's time for a new election! **{appointed_president.name}** will be nominated as new President!"
-        f"\n**{appointed_president.name}** you must **!nominate** a Chancellor then the group will vote."
+        f"\n**{appointed_president.name}** you must **!nominate** a Chancellor then the group will **!vote**."
     )
     await print_game_dashboard(ctx, None, messageAfter)
     game_state = NOMINATE_CHANCELLOR
@@ -611,7 +604,7 @@ async def kill(ctx, targetName: str):
         messageAfter += f"\n\n{reshuffle_msg}"
     messageAfter += (
         f"\n\n It's time for a new election! **{next_president.name}** will be nominated as new President!"
-        f"\n**{next_president.name}** you must **!nominate** a Chancellor then the group will vote."
+        f"\n**{next_president.name}** you must **!nominate** a Chancellor then the group will **!vote**."
     )
     await print_game_dashboard(ctx, None, messageAfter)
     game_state = NOMINATE_CHANCELLOR
@@ -653,20 +646,20 @@ async def veto(ctx, decision: str=None):
             current_president = next_president
             messageAfter = (
                 f"The President **{current_president.name}** has agreed to a veto to this policy agenda!"
-                f"\nThe policies will all be discarded and this will be considered as a time of inactive government."
+                f"\nThe policies will all be discarded and this will be considered an election failure."
                 )
             reshuffle_msg = start_new_round()
             if reshuffle_msg is not None:
                 messageAfter += f"\n\n{reshuffle_msg}"
             messageAfter += (
                 f"\n\nIt's time for a new election! **{next_president.name}** will be nominated as new President!"
-                f"\n**{next_president.name}** you must **!nominate** a Chancellor then the group will vote."
+                f"\n**{next_president.name}** you must **!nominate** a Chancellor then the group will **!vote**."
             )
             await print_game_dashboard(ctx, None, messageAfter)
             game_state = NOMINATE_CHANCELLOR
         if decision.lower() in ['nein', 'nein!']:
-            await ctx.send(f"The President **{current_president.name}** has disagreed to a veto to this policy agenda!"
-                        f"\nThe current chancellor {current_chancellor.name} must enact a policy!.")
+            await ctx.send(f"The President **{current_president.name}** has disagreed to veto to this policy agenda!"
+                        f"\nThe current chancellor {current_chancellor.name} must **!enact** a policy!.")
             game_state = CHANCELLOR_LEGISLATION
         return
     
