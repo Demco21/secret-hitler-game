@@ -721,7 +721,7 @@ async def print_game_dashboard(ctx, msgBefore=None, msgAfter=None):
     for player in assassinated:
         message += f"\n- {player.name} (Assassinated)"
     message += (
-        f"\n\n**Policy Deck <:{LIBERAL_CARD_EMOJI_NAME}:{LIBERAL_CARD_EMOJI_ID}><:{FASCIST_CARD_EMOJI_NAME}:{FASCIST_CARD_EMOJI_ID}>**"
+        f"\n\n**Policy Deck** <:{LIBERAL_CARD_EMOJI_NAME}:{LIBERAL_CARD_EMOJI_ID}><:{FASCIST_CARD_EMOJI_NAME}:{FASCIST_CARD_EMOJI_ID}>"
         f"\n- Draw Pile: {len(policy_cards)} Cards"
         f"\n- Discard Pile: {len(discarded_policies)}"
         )
