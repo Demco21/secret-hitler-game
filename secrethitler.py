@@ -645,7 +645,7 @@ async def veto(ctx, decision: str=None):
             previous_president = current_president
             current_president = next_president
             messageAfter = (
-                f"The President **{current_president.name}** has agreed to a veto to this policy agenda!"
+                f"The President **{current_president.name}** has voted in **favor** of a veto to this policy agenda!"
                 f"\nThe policies will all be discarded and this will be considered an election failure."
                 )
             reshuffle_msg = start_new_round()
@@ -658,7 +658,7 @@ async def veto(ctx, decision: str=None):
             await print_game_dashboard(ctx, None, messageAfter)
             game_state = NOMINATE_CHANCELLOR
         if decision.lower() in ['nein', 'nein!']:
-            await ctx.send(f"The President **{current_president.name}** has disagreed to veto to this policy agenda!"
+            await ctx.send(f"The President **{current_president.name}** has voted **against** a veto of this policy agenda!"
                         f"\nThe current chancellor {current_chancellor.name} must **!enact** a policy!.")
             game_state = CHANCELLOR_LEGISLATION
         return
