@@ -67,6 +67,8 @@ SECRET_HITLER_LOGO_IMG = './images/logo/secret_hitler_logo.jpg'
 LIBERAL_PARTY_CARD_IMG = './images/cards/liberal_party_card.jpg'
 FASCIST_PARTY_CARD_IMG = './images/cards/fascist_party_card.jpg'
 HITLER_CARD_IMG = './images/cards/hitler_card.jpg'
+HITLER_ASSASSINATED_IMG = './images/cards/hitler_assassinated_card.jpg'
+HITLER_CHANCELLOR_IMG = './images/cards/hitler_chancellor_card.jpg'
 
 # Game Variables
 game_state = GAME_NOT_STARTED
@@ -272,7 +274,7 @@ async def start(ctx):
         return
 
     num_players = len(players)
-    num_fascists = {5: 1, 6: 1, 7: 2, 8: 2, 9:3, 10:4}[num_players]
+    num_fascists = {5: 1, 6: 1, 7: 2, 8: 2, 9:3, 10:3}[num_players]
     num_liberals = num_players - num_fascists - 1
 
     logger.info(f"Starting game with {num_players} players in {game_mode} mode.")
@@ -384,7 +386,7 @@ async def election_success(message):
     global role_assignments, fascist_policies, previous_president, current_president, top_cards, game_state, policy_cards
     if role_assignments[current_chancellor] == HITLER and fascist_policies >= 3:
         message += "\n\n**GAME OVER, HITLER WAS ELECTED CHANCELLOR! FASCISTS WIN!**"
-        await game_over(message)
+        await game_over(message, HITLER_CHANCELLOR_IMG)
         return
     top_cards = policy_cards[:min(3, len(policy_cards))]
     policy_cards = policy_cards[min(3, len(policy_cards)):]
@@ -483,11 +485,11 @@ async def enact(ctx, card=None):
 
     if fascist_policies == 6:
         await game_channel.send(message)
-        await game_over("**GAME OVER, 6 FASCIST POLICIES WERE ENACTED! FASCISTS WIN!**")
+        await game_over("**GAME OVER, 6 FASCIST POLICIES WERE ENACTED! FASCISTS WIN!**", get_fascist_board_img_file())
         return
     if liberal_policies == 5:
         await game_channel.send(message)
-        await game_over("**GAME OVER, 5 LIBERAL POLICIES WERE ENACTED! LIBERALS WIN!**")
+        await game_over("**GAME OVER, 5 LIBERAL POLICIES WERE ENACTED! LIBERALS WIN!**", get_liberal_board_img_file())
         return
     
     newGameState = NOMINATE_CHANCELLOR
@@ -549,11 +551,9 @@ def process_presidential_powers(message):
         return EXECUTIVE_KILL, message
     elif fascist_policies == 5:
         message += (
-            f"\nSince 5 Fascist policies have been enacted, your President **{current_president.name}** gets to assassinate another player!"
+            f"\nSince 5 Fascist policies have been enacted, your President **{current_president.name}** gets to assassinate another player and **!veto** power is unlocked!"
+            f"\nWhen choosing a policy, the **Chancellor** may **!veto** the policy agenda. If the **President** agrees, no policy is enacted."
             f"\n**{current_president.name}** please choose a player to assassinate using **!kill [player_name]** (Ex. !kill bob)"
-            f"\nAdditionally, the **veto** power is now unlocked. The Chancellor may veto any policy agenda using **!veto** while deciding on a policy to enact."
-            f"\nIf the President approves this veto (**!veto ja**), all policies will be discarded and the round will move on. This will be considered an inactive government."
-            f"\nIf the President does not approve (**!veto nein**), the Chancellor will be forced to enact a policy."
             )
         return EXECUTIVE_KILL, message
     else:
@@ -654,12 +654,11 @@ async def kill(ctx, targetName: str):
         await game_channel.send("Could not find that player, try again.")
         return
     
-    if role_assignments[victim] == HITLER:
-        await game_over("**GAME OVER, HITLER HAS BEEN ASSASSINATED! LIBERALS WIN!**")
-        return
-    
     players.remove(victim)
     assassinated.append(victim)
+    if role_assignments[victim] == HITLER:
+        await game_over("**GAME OVER, HITLER HAS BEEN ASSASSINATED! LIBERALS WIN!**", HITLER_ASSASSINATED_IMG)
+        return
     messageAfter = f"**{victim.name}** has been assassinated in cold blood! Oh dear!"
     reshuffle_msg = start_new_round()
     if reshuffle_msg is not None:
@@ -907,7 +906,7 @@ def reset_game():
     current_president = None
     current_chancellor = None
 
-async def game_over(msg):
+async def game_over(msg, img=None):
     global players, assassinated, role_assignments
     fascists = []
     liberals = []
@@ -932,13 +931,14 @@ async def game_over(msg):
             hitler = player
 
     # Construct the message with the list of players in each role
-    msg += f"\n\n**HITLER:**\n- {hitler.name} (assassinated)" if hitler in assassinated else f"\n\n**HITLER:**\n- {hitler.name}"
+    msg += f"\n\n**Hitler:**\n- {hitler.name} (Assassinated)" if hitler in assassinated else f"\n\n**Hitler:**\n- {hitler.name}"
     
-    msg += f"\n\n**FASCISTS:**\n" + "\n".join(f"- {fascist.name} (assassinated)" if fascist in assassinated else f"- {fascist.name}" for fascist in fascists)
+    msg += f"\n\n**Fascists:**\n" + "\n".join(f"- {fascist.name} (Assassinated)" if fascist in assassinated else f"- {fascist.name}" for fascist in fascists)
     
-    msg += f"\n\n**LIBERALS:**\n" + "\n".join(f"- {liberal.name} (assassinated)" if liberal in assassinated else f"- {liberal.name}" for liberal in liberals)
+    msg += f"\n\n**Liberals:**\n" + "\n".join(f"- {liberal.name} (Assassinated)" if liberal in assassinated else f"- {liberal.name}" for liberal in liberals)
     
-    logger.info(f"Ending Game: {msg}")
+    if img:
+        await game_channel.send(file=discord.File(img))
     await game_channel.send(msg)
     reset_game()
 
