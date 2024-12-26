@@ -6,6 +6,7 @@ from discord.ext import commands
 from dotenv import load_dotenv
 import random
 import asyncio
+from unittest.mock import MagicMock, AsyncMock
 
 # Load environment variables from .env file
 load_dotenv()
@@ -38,31 +39,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Game variables
-players = []
-assassinated = []
-roles = []
-role_assignments = {}
-votes = {}
-game_state = 0
-liberal_policies = 0
-fascist_policies = 0
-policy_cards = []
-top_cards = []
-discarded_policies = []
-failed_election_count = 0
-previous_president = None
-current_president = None
-current_chancellor = None
-game_type = 'fiveplayers'
-game_channel = None
-
-# Role definitions
-LIBERAL = "Liberal"
-FASCIST = "Fascist"
-HITLER = "Hitler"
-
-# States
+# Game States
 GAME_NOT_STARTED = 0
 GAME_STARTING = 1
 NOMINATE_CHANCELLOR = 2
@@ -75,11 +52,39 @@ EXECUTIVE_APPOINTMENT = 8
 EXECUTIVE_KILL = 9
 AGENDA_VETOED = 10
 
-#images
+# Role definitions
+LIBERAL = "Liberal"
+FASCIST = "Fascist"
+HITLER = "Hitler"
+
+# Game Types
+FIVE_SIX_PLAYER_GAME_MODE = 'fiveplayers'
+SEVEN_EIGHT_PLAYER_GAME_MODE = 'sevenplayers'
+NINE_TEN_PLAYER_GAME_MODE = 'nineplayers'
+
+# Images
 SECRET_HITLER_LOGO_IMG = './images/logo/secret_hitler_logo.jpg'
 LIBERAL_PARTY_CARD_IMG = './images/cards/liberal_party_card.jpg'
 FASCIST_PARTY_CARD_IMG = './images/cards/fascist_party_card.jpg'
 HITLER_CARD_IMG = './images/cards/hitler_card.jpg'
+
+# Game Variables
+game_state = GAME_NOT_STARTED
+players = []
+assassinated = []
+role_assignments = {}
+votes = {}
+liberal_policies = 0
+fascist_policies = 0
+policy_cards = []
+discarded_policies = []
+top_cards = []
+failed_election_count = 0
+previous_president = None
+current_president = None
+current_chancellor = None
+game_mode = None
+game_channel = None
 
 @bot.event
 async def on_ready():
@@ -90,7 +95,7 @@ async def on_ready():
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.CheckFailure):
-        logger.info(f"User {ctx.author.name} is not allowed to use this command. Please make sure you meet the requirements.")
+        logger.info(f"User **{ctx.author.name}** is not allowed to use this command. Please make sure you meet the requirements.")
     else:
         logger.error(f"Command {ctx.command} caused an error. {error}")
 
@@ -122,21 +127,84 @@ def is_game_channel(showResponse=True):
 
 @bot.command()
 @is_game_channel()
+async def tester(ctx, cmd, arg1, arg2=None):
+    """Testing utility for developers."""
+    global players
+    if ENV_TOKEN_SUFFIX == '_PROD':
+        return
+    _players = {
+        '1': {'name': 'Player1', 'id': 1},
+        '2': {'name': 'Player2', 'id': 2},
+        '3': {'name': 'Player3', 'id': 3},
+        '4': {'name': 'Player4', 'id': 4},
+        '5': {'name': 'Player5', 'id': 5},
+        '6': {'name': 'Player6', 'id': 6},
+        '7': {'name': 'Player7', 'id': 7},
+        '8': {'name': 'Player8', 'id': 8},
+        '9': {'name': 'Player9', 'id': 9}
+    }
+    noArgCommands = {
+        'join': join,
+        'ready': ready,
+        'start': start,
+        'leave': leave,
+        'lobby': lobby,
+        'reset': reset,
+    }
+    argCommands = {
+        'nominate': nominate,
+        'vote': vote,
+        'discard': discard,
+        'enact': enact,
+        'investigate': investigate,
+        'appoint': appoint,
+        'kill': kill,
+        'veto': veto
+    }
+    if cmd == 'join':
+        if arg1 in _players:
+            mock_author = MagicMock()
+            mock_author.send = AsyncMock()
+            mock_author.name = _players[arg1]['name']
+            mock_author.id = _players[arg1]['id']
+            ctx.author = mock_author
+        else:
+            await ctx.send('Invalid test player. Must be 1-9.')
+            return
+    else:
+        found = False
+        for player in players:
+            if int(player.id) == int(arg1):
+                ctx.author = player
+                found = True
+        if not found:
+            await ctx.send('Invalid test player.')
+            return
+    if cmd in noArgCommands:
+        await noArgCommands[cmd](ctx)
+    elif cmd in argCommands:
+        await argCommands[cmd](ctx, arg2)
+    else:
+        await ctx.send('Invalid command.')
+
+
+@bot.command()
+@is_game_channel()
 async def join(ctx):
     """Allows a player to join the game."""
     global game_state
 
     if game_state != GAME_NOT_STARTED:
-        await ctx.send("The game has already started. Please wait for the next round!")
+        await game_channel.send("The game has already started. Please wait for the next round!")
         return
 
     if ctx.author in players:
-        await ctx.send("You are already in the game!")
-    elif len(players) >= 8:
-        await ctx.send("The game is full. Only 5 to 8 players can join!")
+        await game_channel.send("You are already in the game!")
+    elif len(players) >= 10:
+        await game_channel.send("The game is full. Only 5 to 10 players can join!")
     else:
         players.append(ctx.author)
-        await ctx.send(f"{ctx.author.name} has joined the game! ({len(players)}/8 players)")
+        await game_channel.send(f"**{ctx.author.name}** has joined the game! ({len(players)}/10 players)")
 
 @bot.command()
 @is_player()
@@ -147,37 +215,37 @@ async def leave(ctx):
     if game_state == GAME_NOT_STARTED:
         players.remove(ctx.author)
         message = (f"**{ctx.author.name}** has left the lobby. ({len(players)}/8 players)")
-        await ctx.send(message)
+        await game_channel.send(message)
     else:
-        await ctx.send("Match is in progress.")
+        await game_channel.send("Match is in progress.")
 
 @bot.command()
 @is_player()
 @is_game_channel()
 async def ready(ctx):
     """Ready to play the game if enough players have joined."""
-    global roles, role_assignments, policy_cards, game_state, current_president, players, game_type
+    global role_assignments, policy_cards, game_state, current_president, players, game_mode
 
     if len(players) < 5:
-        await ctx.send(f"You need at least 5 players to start the game! ({len(players)}/8 players)")
+        await game_channel.send(f"You need at least 5 players to start the game! ({len(players)}/10 players)")
         return
 
-    if len(players) > 8:
-        await ctx.send(f"The game can only have a maximum of 8 players! ({len(players)}/8 players)")
+    if len(players) > 10:
+        await game_channel.send(f"The game can only have a maximum of 8 players! ({len(players)}/10 players)")
         return
     
     if game_state != GAME_NOT_STARTED:
-        await ctx.send("The game has already started!")
+        await game_channel.send("The game has already started!")
         return
     
     if len(players) in [5,6]:
-        game_type = 'fiveplayers'
+        game_mode = FIVE_SIX_PLAYER_GAME_MODE
     if len(players) in [7,8]:
-        game_type = 'sevenplayers'
+        game_mode = SEVEN_EIGHT_PLAYER_GAME_MODE
     if len(players) in [9,10]:
-        game_type = 'nineplayers'
-    await ctx.send(file=discord.File(SECRET_HITLER_LOGO_IMG))
-    await ctx.send(get_intro_screen())
+        game_mode = NINE_TEN_PLAYER_GAME_MODE
+    await game_channel.send(file=discord.File(SECRET_HITLER_LOGO_IMG))
+    await game_channel.send(get_intro_screen())
     game_state = GAME_STARTING
     
 @bot.command()
@@ -185,33 +253,33 @@ async def ready(ctx):
 @is_game_channel()
 async def start(ctx):
     """Starts the game after ready."""
-    global roles, role_assignments, policy_cards, game_state, current_president, players, game_type
+    global role_assignments, policy_cards, game_state, current_president, players, game_mode
 
     if len(players) < 5:
-        await ctx.send(f"You need at least 5 players to start the game! ({len(players)}/8 players)")
+        await game_channel.send(f"You need at least 5 players to start the game! ({len(players)}/10 players)")
         return
 
-    if len(players) > 8:
-        await ctx.send(f"The game can only have a maximum of 8 players! ({len(players)}/8 players)")
+    if len(players) > 10:
+        await game_channel.send(f"The game can only have a maximum of 8 players! ({len(players)}/10 players)")
         return
     
     if game_state == GAME_NOT_STARTED:
-        await ctx.send("You must type !ready first.")
+        await game_channel.send("You must type !ready first.")
         return
 
     if game_state != GAME_STARTING:
-        await ctx.send("The game has already started!")
+        await game_channel.send("The game has already started!")
         return
 
     num_players = len(players)
-    num_fascists = {5: 1, 6: 1, 7: 2, 8: 2}[num_players]
+    num_fascists = {5: 1, 6: 1, 7: 2, 8: 2, 9:3, 10:4}[num_players]
     num_liberals = num_players - num_fascists - 1
 
-    logger.info(f"Starting game with {num_players} players in {game_type} mode.")
+    logger.info(f"Starting game with {num_players} players in {game_mode} mode.")
 
+    # Assign roles randomly
     roles = [HITLER] + [FASCIST] * num_fascists + [LIBERAL] * num_liberals
     random.shuffle(roles)
-    # Assign roles    
     role_assignments = {player: role for player, role in zip(players, roles)}
     logger.info("Players: [%s]", ", ".join(f"{player.name} ({player.id}) ({role})" for player, role in role_assignments.items()))
 
@@ -223,11 +291,11 @@ async def start(ctx):
     candidate = random.choice(players)
     current_president = candidate
     messageAfter = (
-        f"The game has started! There will be {num_liberals} Liberals and {num_fascists} Fascists with 1 Secret Hitler."
-        f"Your first Presidential Candidate has been randomly selected as **{candidate.name}**!"
+        f"The game has started! There will be **{num_liberals} Liberals** and **{num_fascists} Fascists** with **1 Secret Hitler**."
+        f"\nYour first Presidential Candidate has been randomly selected as **{candidate.name}**!"
         f"\n**{candidate.name}** you must **!nominate** a Chancellor then the group will **!vote**."
         )
-    await print_game_dashboard(ctx, None, messageAfter)
+    await print_game_dashboard(None, messageAfter)
     await send_roles_to_players()
     game_state = NOMINATE_CHANCELLOR
 
@@ -240,28 +308,28 @@ async def nominate(ctx, nomination: str):
 
     # Check if the game state is in the nomination phase
     if game_state != NOMINATE_CHANCELLOR:
-        await ctx.send("Nomination is not allowed at this moment.")
+        await game_channel.send("Nomination is not allowed at this moment.")
         return
     
     if ctx.author != current_president:
-        await ctx.send("Only the President can nominate the Chancellor.")
+        await game_channel.send("Only the President can nominate the Chancellor.")
         return
     
     chancellor = get_player_by_name(nomination)
     if chancellor is None:
-        await ctx.send("Could not find that player, try again.")
+        await game_channel.send("Could not find that player, try again.")
         return
 
     if chancellor == current_president:
-        await ctx.send("You can't nominate yourself as Chancellor, pick someone else.")
+        await game_channel.send("You can't nominate yourself as Chancellor, pick someone else.")
         return
     
     if chancellor == previous_president:
-        await ctx.send("You can't nominate the most recent President as Chancellor, nominate a different Chancellor.")
+        await game_channel.send("You can't nominate the most recent President as Chancellor, nominate a different Chancellor.")
         return
     
     current_chancellor = chancellor
-    await ctx.send(f"President **{current_president.name}** has nominated **{chancellor.name}** as Chancellor, time to cast your votes!\n**!vote ja** or **!vote nein**")
+    await game_channel.send(f"President **{current_president.name}** has nominated **{chancellor.name}** as Chancellor, time to cast your votes!\nEveryone cast your votes by typing **!vote ja** or **!vote nein**")
     game_state = ELECTION
     
 
@@ -274,21 +342,21 @@ async def vote(ctx, vote: str):
     
     # Check if the game state is in the election phase
     if game_state != ELECTION:
-        await ctx.send("Voting is not allowed at this moment.")
+        await game_channel.send("Voting is not allowed at this moment.")
         return
     
     if ctx.author == current_chancellor or ctx.author == current_president:
-        await ctx.send("Chancellor and President do not vote!")
+        await game_channel.send("Chancellor and President do not vote!")
         return    
     
     # Check if the player is eligible to vote (not already voted)
     if ctx.author in votes:
-        await ctx.send("You have already voted!")
+        await game_channel.send("You have already voted!")
         return
 
     # Validate the vote input
     if vote.lower() not in ['ja', 'ja!', 'nein', 'nein!']:
-        await ctx.send("Please vote with either 'Ja!' or 'Nein!'")
+        await game_channel.send("Please vote with either 'Ja!' or 'Nein!'")
         return
     
     # Record the vote
@@ -299,59 +367,57 @@ async def vote(ctx, vote: str):
     voted_players = len(votes)
 
     if voted_players != votes_needed:
-        await ctx.send(f"votes: ({voted_players}/{votes_needed})")
+        await game_channel.send(f"votes: ({voted_players}/{votes_needed})")
     if voted_players == votes_needed:
         # Tally votes
         ja_votes = sum(1 for vote in votes.values() if vote.lower() in ['ja', 'ja!'])
-        nein_votes = votes_needed - ja_votes  # All other votes are Nein
-
-        message = (
-            f"- Ja!: {ja_votes} votes\n- Nein!: {nein_votes} votes"
-            )
-
-        # Determine the outcome
+        nein_votes = votes_needed - ja_votes
+        message = (f"- Ja!: {ja_votes} votes\n- Nein!: {nein_votes} votes")
         if ja_votes > nein_votes:
-            if role_assignments[current_chancellor] == HITLER and fascist_policies >= 3:
-                message += "\n\n**GAME OVER, HITLER WAS ELECTED CHANCELLOR! FASCISTS WIN!**"
-                await game_over(ctx, message)
-                return
-            previous_president = current_president
-            top_cards = policy_cards[:min(3, len(policy_cards))]
-            policy_cards = policy_cards[min(3, len(policy_cards)):]
-            message += (
-                f"\nThe election was successful! The candidate is elected!"
-                f"\n\nWaiting for your new President **{current_president.name}** to **!discard** one policy before your Chancellor **{current_chancellor.name}** will **!enact** one."
-                )
-            await print_game_dashboard(ctx, None, message)
-            president_message = (
-                "As president, you will select 1 of the top policies to be discarded before the Chancellor has a chance to enact one of the policies."
-                "\nDiscard one card using **!discard 1** or **!discard 2** or **!discard 3** to select."
-            )
-            await send_top_cards_img(current_president, president_message)
-            game_state = PRESIDENTIAL_LEGISLATION
-
+            await election_success(message)
         else:
-            enact_top_policy_msg = ''
-            failed_election_count += 1
-            if failed_election_count == 3:
-                top_policy = policy_cards[0]
-                enact_top_policy()
-                enact_top_policy_msg = f'\nThis is the 3rd failed election so the **{top_policy}** policy on the top of the draw pile has been enacted.'
-                failed_election_count = 0
-            next_player = get_next_player(current_president)
-            if next_player == previous_president:
-                next_player = get_next_player(next_player)
-            current_chancellor = None
-            current_president = next_player
-            message = (
-                f"The election failed! The candidate was not elected. {enact_top_policy_msg}"
-                f"\n**{current_president.name}** has been chosen as the new Presidential Candidate."
-                f"\n**{current_president.name}** you must **!nominate** a Chancellor then the group will **!vote** again."
-                )
-            await print_game_dashboard(ctx, None, message)
-            game_state = NOMINATE_CHANCELLOR
+            await election_failed(message)
         # Reset the votes for the next round
         votes = {}
+
+async def election_success(message):
+    global role_assignments, fascist_policies, previous_president, current_president, top_cards, game_state, policy_cards
+    if role_assignments[current_chancellor] == HITLER and fascist_policies >= 3:
+        message += "\n\n**GAME OVER, HITLER WAS ELECTED CHANCELLOR! FASCISTS WIN!**"
+        await game_over(message)
+        return
+    top_cards = policy_cards[:min(3, len(policy_cards))]
+    policy_cards = policy_cards[min(3, len(policy_cards)):]
+    message += (
+        f"\nThe election was successful! **{current_president.name}** is your **President** and **{current_chancellor.name}** is your **Chancellor**!"
+        f"\nDrawing the top 3 policy cards and sending them to President **{current_president.name}** for review..."
+        f"\nPresident **{current_president.name}** must **!discard** one policy before Chancellor **{current_chancellor.name}** will **!enact** one."
+        )
+    await print_game_dashboard(None, message)
+    president_message = (
+        "As President, you will select 1 of the top policies to be discarded before the Chancellor has a chance to enact one of the policies."
+        "\nDiscard one card using **!discard 1** or **!discard 2** or **!discard 3** to select."
+    )
+    await send_top_cards_img(current_president, president_message)
+    game_state = PRESIDENTIAL_LEGISLATION
+
+async def election_failed(message):
+    global current_chancellor, current_president, policy_cards, game_state, failed_election_count
+    enact_top_policy_msg = ''
+    failed_election_count += 1
+    if failed_election_count == 3:
+        top_policy = policy_cards[0]
+        enact_top_policy()
+        enact_top_policy_msg = f'\nThis is the 3rd failed election so the **{top_policy}** policy on the top of the draw pile has been enacted.'
+        failed_election_count = 0
+    current_president = get_next_president()
+    message += (
+        f"The election failed! The candidates were not elected. {enact_top_policy_msg}"
+        f"\n**{current_president.name}** has been chosen as the new Presidential Candidate."
+        f"\n**{current_president.name}** you must **!nominate** a Chancellor then the group will **!vote** again."
+        )
+    await print_game_dashboard(None, message)
+    game_state = NOMINATE_CHANCELLOR
 
 @bot.command()
 @is_player()
@@ -361,25 +427,25 @@ async def discard(ctx, card: str):
     global top_cards, game_state, current_chancellor, current_president
     
     if game_state != PRESIDENTIAL_LEGISLATION:
-        await ctx.send("You cannot discard any policies at this time.")
+        await game_channel.send("You cannot discard any policies at this time.")
         return
     
     if ctx.author != current_president:
-        await ctx.send("Only the president can discard a policy.")
+        await game_channel.send("Only the president can discard a policy.")
         return
     
     if card != '1' and card != '2' and card != '3':
-        await ctx.send("Invalid card number.")
+        await game_channel.send("Invalid card number.")
         return
     
     cardNum = int(card)
     
     if cardNum > len(top_cards):
-        await ctx.send("Invalid card number.")
+        await game_channel.send("Invalid card number.")
         return
     
     discarded_policies.append(top_cards.pop(cardNum-1))
-    await ctx.send(f"Your President {current_president.name} has chosen a policy to discard, it's time for your Chancellor {current_chancellor.name} to enact a policy!")
+    await game_channel.send(f"Your President **{current_president.name}** has chosen a policy to **discard**.\nIt's time for your Chancellor **{current_chancellor.name}** to **!enact** a policy!")
     game_state = CHANCELLOR_LEGISLATION
     chancellor_message = (
         "As Chancellor, you will select one of the two policies left for you by the President to enact."
@@ -390,28 +456,66 @@ async def discard(ctx, card: str):
 @bot.command()
 @is_player()
 @is_game_channel()
-async def enact(ctx, card: str):
+async def enact(ctx, card=None):
     """Allows Chancellor to enact a policy."""
     global top_cards, game_state, current_chancellor, current_president, previous_president, fascist_policies, liberal_policies
     
     if game_state != CHANCELLOR_LEGISLATION:
-        await ctx.send("You cannot enact any policies at this time.")
+        await game_channel.send("You cannot enact any policies at this time.")
         return
     
-    if ctx.author != current_president:
-        await ctx.send("Only the chancellor can enact a policy.")
+    if ctx.author != current_chancellor:
+        await game_channel.send("Only the Chancellor can enact a policy.")
         return
     
-    if card != '1' and card != '2':
-        await ctx.send("Invalid card number.")
+    if card not in {'1', '2'}:
+        await game_channel.send("Invalid card number.")
         return
-    
+
     cardNum = int(card)
-    
     if cardNum > len(top_cards):
-        await ctx.send("Invalid card number.")
+        await game_channel.send("Invalid card number.")
+        return
+    policy = get_enacted_policy_and_discard(cardNum)
+    message = (
+        f"Your Chancellor **{current_chancellor.name}** has chosen to enact a **{policy}** policy!"
+    )
+
+    if fascist_policies == 6:
+        await game_channel.send(message)
+        await game_over("**GAME OVER, 6 FASCIST POLICIES WERE ENACTED! FASCISTS WIN!**")
+        return
+    if liberal_policies == 5:
+        await game_channel.send(message)
+        await game_over("**GAME OVER, 5 LIBERAL POLICIES WERE ENACTED! LIBERALS WIN!**")
         return
     
+    newGameState = NOMINATE_CHANCELLOR
+    if policy == FASCIST:
+        newGameState, message = process_presidential_powers(message)
+    
+    reshuffle_msg = start_new_round()
+    if reshuffle_msg is not None:
+        message += f"\n{reshuffle_msg}"
+
+    if newGameState == EXECUTIVE_EXAMINATION:
+        message += (
+            f"\nSince 3 Fascist policies have been enacted, your President **{current_president.name}** gets to view the top 3 cards on the draw pile!"
+        )
+        await examine_top_cards()
+        newGameState = NOMINATE_CHANCELLOR
+    if newGameState == NOMINATE_CHANCELLOR:
+        previous_president = current_president
+        current_president = get_next_president()
+        message += (
+            f"\nIt's time for a new election! **{current_president.name}** will be nominated as new President!"
+            f"\n**{current_president.name}** you must **!nominate** a Chancellor then the group will **!vote**."
+        )
+    await print_game_dashboard(None, message)
+    game_state = newGameState
+
+def get_enacted_policy_and_discard(cardNum):
+    global top_cards, discarded_policies, fascist_policies, liberal_policies
     policy = top_cards.pop(cardNum-1)
     discarded_policies.extend(top_cards)
     top_cards = []
@@ -419,114 +523,77 @@ async def enact(ctx, card: str):
         fascist_policies += 1
     if policy == LIBERAL:
         liberal_policies += 1
+    return policy
 
-    message = (
-        f"Your Chancellor **{current_chancellor.name}** has chosen to enact a {policy} policy!"
-    )
-    if policy == FASCIST and (fascist_policies == 2 and game_type == 'sevenplayers)') or (fascist_policies in [1,2] and game_type == 'tenplayers'):
+def process_presidential_powers(message):
+    global fascist_policies, game_mode, current_president
+    if (fascist_policies == 2 and game_mode == SEVEN_EIGHT_PLAYER_GAME_MODE) or (fascist_policies in [1,2] and game_mode == NINE_TEN_PLAYER_GAME_MODE):
         message += (
-            f"\n\nSince 2 Fascist policies have been enacted, your President **{current_president.name}** gets to investigate one player's party membership!"
-            f"\n\n**{current_president.name}** please choose a player to investigate using **!investigate [player_name]** (Ex. !investigate bob)"
+            f"\nSince 2 Fascist policies have been enacted, your President **{current_president.name}** gets to investigate one player's party membership!"
+            f"\n**{current_president.name}** please choose a player to investigate using **!investigate [player_name]** (Ex. !investigate bob)"
             )
-        await ctx.send(message)
-        game_state = EXECUTIVE_INVESTIGATION
-        return
-    if policy == FASCIST and fascist_policies == 3 and game_type in ['sevenplayers', 'nineplayers']:
+        return EXECUTIVE_INVESTIGATION, message
+    elif fascist_policies == 3 and game_mode in [SEVEN_EIGHT_PLAYER_GAME_MODE, NINE_TEN_PLAYER_GAME_MODE]:
         message += (
-            f"\n\nSince 3 Fascist policies have been enacted, your President **{current_president.name}** gets to appoint the next president!"
-            f"\n\n**{current_president.name}** please choose a player to appoint to president using **!appoint [player_name]** (Ex. !appoint bob)"
+            f"\nSince 3 Fascist policies have been enacted, your President **{current_president.name}** gets to appoint the next president!"
+            f"\n**{current_president.name}** please choose a player to appoint to president using **!appoint [player_name]** (Ex. !appoint bob)"
             )
-        await ctx.send(message)
-        game_state = EXECUTIVE_APPOINTMENT
-        return
-    if policy == FASCIST and fascist_policies == 4:
+        return EXECUTIVE_APPOINTMENT, message
+    elif fascist_policies == 3 and game_mode == FIVE_SIX_PLAYER_GAME_MODE:
+        return EXECUTIVE_EXAMINATION, message
+    elif fascist_policies == 4:
         message += (
-            f"\n\nSince 4 Fascist policies have been enacted, your President **{current_president.name}** gets to assassinate another player!"
-            f"\n\n**{current_president.name}** please choose a player to assassinate using **!kill [player_name]** (Ex. !kill bob)"
+            f"\nSince 4 Fascist policies have been enacted, your President **{current_president.name}** gets to assassinate another player!"
+            f"\n**{current_president.name}** please choose a player to assassinate using **!kill [player_name]** (Ex. !kill bob)"
             )
-        await ctx.send(message)
-        game_state = EXECUTIVE_KILL
-        return
-    if policy == FASCIST and fascist_policies == 5:
+        return EXECUTIVE_KILL, message
+    elif fascist_policies == 5:
         message += (
-            f"\n\nSince 5 Fascist policies have been enacted, your President **{current_president.name}** gets to assassinate another player!"
-            f"\n\n**{current_president.name}** please choose a player to assassinate using **!kill [player_name]** (Ex. !kill bob)"
-            f"\n\nAdditionally, the **veto** power is now unlocked. The Chancellor may veto any policy agenda using **!veto** while deciding on a policy to enact."
+            f"\nSince 5 Fascist policies have been enacted, your President **{current_president.name}** gets to assassinate another player!"
+            f"\n**{current_president.name}** please choose a player to assassinate using **!kill [player_name]** (Ex. !kill bob)"
+            f"\nAdditionally, the **veto** power is now unlocked. The Chancellor may veto any policy agenda using **!veto** while deciding on a policy to enact."
             f"\nIf the President approves this veto (**!veto ja**), all policies will be discarded and the round will move on. This will be considered an inactive government."
             f"\nIf the President does not approve (**!veto nein**), the Chancellor will be forced to enact a policy."
             )
-        await ctx.send(message)
-        game_state = EXECUTIVE_KILL
-        return
-    if fascist_policies == 6:
-        await ctx.send(message)
-        await game_over(ctx, "**GAME OVER, 6 FASCIST POLICIES WERE ENACTED! FASCISTS WIN!**")
-        return
-    if liberal_policies == 5:
-        await ctx.send(message)
-        await game_over(ctx, "**GAME OVER, 5 LIBERAL POLICIES WERE ENACTED! LIBERALS WIN!**")
-        return
-    
-    reshuffle_msg = start_new_round()
-    if reshuffle_msg is not None:
-        message += f"\n{reshuffle_msg}"
-
-    if policy == FASCIST and fascist_policies == 3 and game_type == 'fiveplayers':
-        message += (
-            f"\nSince 3 Fascist policies have been enacted, your President **{current_president.name}** gets to view the top 3 cards on the draw pile!"
-            )
-        await examine_top_cards()
-        
-    next_president = get_next_player(current_president)
-    if next_president == previous_president:
-        next_president = get_next_player(next_president)
-    previous_president = current_president
-    current_president = next_president
-    message += (
-        f"\nIt's time for a new election! **{next_president.name}** will be nominated as new President!"
-        f"\n**{next_president.name}** you must **!nominate** a Chancellor then the group will **!vote**."
-    )
-    await print_game_dashboard(ctx, None, message)
-    game_state = NOMINATE_CHANCELLOR
+        return EXECUTIVE_KILL, message
+    else:
+        return NOMINATE_CHANCELLOR, message
 
 @bot.command()
 @is_player()
 @is_game_channel()
 async def investigate(ctx, suspect_name: str):
     """Allows the President to investigate a party member."""
-    global role_assignments, game_state, current_chancellor, current_president, previous_president
+    global role_assignments, game_state, current_chancellor, current_president, previous_president, game_channel
 
     # Check if the game state is in the nomination phase
     if game_state != EXECUTIVE_INVESTIGATION:
-        await ctx.send("Investigation is not allowed at this moment.")
+        await game_channel.send("Investigation is not allowed at this moment.")
         return
     
     if ctx.author != current_president:
-        await ctx.send("Only the President can nominate the Chancellor.")
+        await game_channel.send("Only the President can nominate the Chancellor.")
         return
     
     suspect = get_player_by_name(suspect_name)
     if suspect is None:
-        await ctx.send("Could not find that player, try again.")
+        await game_channel.send("Could not find that player, try again.")
         return
     
     await ctx.author.send(
-        f"{suspect.name} is part of the {role_assignments[suspect]} party"
+        f"**{suspect.name}** is part of the **{role_assignments[suspect]}** party"
     )
-    next_president = get_next_player(current_president)
-    if next_president == previous_president:
-        next_president = get_next_player(next_president)
     previous_president = current_president
-    current_president = next_president
-    messageAfter = f"{ctx.author.name} has investigated which party {suspect_name} is truly loyal to."
+    current_president = get_next_president()
+    messageAfter = f"**{ctx.author.name}** has investigated which party **{suspect_name}** is truly loyal to."
     reshuffle_msg = start_new_round()
     if reshuffle_msg is not None:
         messageAfter += f"\n\n{reshuffle_msg}"
     messageAfter = (
-        f"\n\n It's time for a new election! **{next_president.name}** will be nominated as new President!"
-        f"\n**{next_president.name}** you must **!nominate** a Chancellor then the group will **!vote**."
+        f"\n\n It's time for a new election! **{current_president.name}** will be nominated as new President!"
+        f"\n**{current_president.name}** you must **!nominate** a Chancellor then the group will **!vote**."
     )
-    await print_game_dashboard(ctx, None, messageAfter)
+    await print_game_dashboard(None, messageAfter)
     game_state = NOMINATE_CHANCELLOR
 
 @bot.command()
@@ -534,24 +601,24 @@ async def investigate(ctx, suspect_name: str):
 @is_game_channel()
 async def appoint(ctx, appointed_name: str):
     """Allows the President to appoint a party member."""
-    global game_state, current_president, previous_president
+    global game_state, current_president, previous_president, game_channel
 
     # Check if the game state is in the nomination phase
     if game_state != EXECUTIVE_APPOINTMENT:
-        await ctx.send("Appointment is not allowed at this moment.")
+        await game_channel.send("Appointment is not allowed at this moment.")
         return
     
     if ctx.author != current_president:
-        await ctx.send("Only the President can appoint the next president.")
+        await game_channel.send("Only the President can appoint the next president.")
         return
     
     appointed_president = get_player_by_name(appointed_name)
     if appointed_president is None:
-        await ctx.send("Could not find that player, try again.")
+        await game_channel.send("Could not find that player, try again.")
         return
   
     if appointed_president == current_president:
-        await ctx.send("You can't appoint yourself, choose somebody else.")
+        await game_channel.send("You can't appoint yourself, choose somebody else.")
         return
     
     previous_president = current_president
@@ -564,7 +631,7 @@ async def appoint(ctx, appointed_name: str):
         f"\n\n It's time for a new election! **{appointed_president.name}** will be nominated as new President!"
         f"\n**{appointed_president.name}** you must **!nominate** a Chancellor then the group will **!vote**."
     )
-    await print_game_dashboard(ctx, None, messageAfter)
+    await print_game_dashboard(None, messageAfter)
     game_state = NOMINATE_CHANCELLOR
 
 @bot.command()
@@ -572,41 +639,38 @@ async def appoint(ctx, appointed_name: str):
 @is_game_channel()
 async def kill(ctx, targetName: str):
     """Allows the President to kill a party member."""
-    global game_state, current_president, previous_president, players
+    global game_state, current_president, previous_president, players, game_channel
 
     if game_state != EXECUTIVE_KILL:
-        await ctx.send("Killing is not allowed at this moment.")
+        await game_channel.send("Killing is not allowed at this moment.")
         return
     
     if ctx.author != current_president:
-        await ctx.send("Only the President can kill.")
+        await game_channel.send("Only the President can kill.")
         return
     
     victim = get_player_by_name(targetName)
     if victim is None:
-        await ctx.send("Could not find that player, try again.")
+        await game_channel.send("Could not find that player, try again.")
         return
     
     if role_assignments[victim] == HITLER:
-        await game_over(ctx, "**GAME OVER, HITLER HAS BEEN ASSASSINATED! LIBERALS WIN!**")
+        await game_over("**GAME OVER, HITLER HAS BEEN ASSASSINATED! LIBERALS WIN!**")
         return
     
-    next_president = get_next_player(current_president)
-    if next_president == previous_president:
-        next_president = get_next_player(next_president)
-    previous_president = current_president
-    current_president = next_president
     players.remove(victim)
     assassinated.append(victim)
     messageAfter = f"**{victim.name}** has been assassinated in cold blood! Oh dear!"
     reshuffle_msg = start_new_round()
     if reshuffle_msg is not None:
         messageAfter += f"\n\n{reshuffle_msg}"
+    previous_president = current_president
+    current_president = get_next_president()
     messageAfter += (
-        f"\n\n It's time for a new election! **{next_president.name}** will be nominated as new President!"
-        f"\n**{next_president.name}** you must **!nominate** a Chancellor then the group will **!vote**."
+        f"\nIt's time for a new election! **{current_president.name}** will be nominated as new President!"
+        f"\n**{current_president.name}** you must **!nominate** a Chancellor then the group will **!vote**."
     )
-    await print_game_dashboard(ctx, None, messageAfter)
+    await print_game_dashboard(None, messageAfter)
     game_state = NOMINATE_CHANCELLOR
 
 @bot.command()
@@ -617,20 +681,20 @@ async def veto(ctx, decision: str=None):
     global game_state, current_president, previous_president, players, top_cards
 
     if fascist_policies != 5:
-        await ctx.send("Veto power is not yet unlocked. You must enact 5 Fascist policies.")
+        await game_channel.send("Veto power is not yet unlocked. You must enact 5 Fascist policies.")
         return
     if game_state != CHANCELLOR_LEGISLATION and game_state != AGENDA_VETOED:
-        await ctx.send("Veto is not allowed at this moment.")
+        await game_channel.send("Veto is not allowed at this moment.")
         return
     if ctx.author != current_chancellor and game_state == CHANCELLOR_LEGISLATION:
-        await ctx.send(f"Only the Chancellor **{current_chancellor.name}** can call a veto.")
+        await game_channel.send(f"Only the Chancellor **{current_chancellor.name}** can call a veto.")
         return
     if ctx.author != current_president and game_state == AGENDA_VETOED:
-        await ctx.send(f"Waiting for veto confirmation from the president **{current_president.name}**.")
+        await game_channel.send(f"Waiting for veto confirmation from the president **{current_president.name}**.")
         return
     
     if ctx.author == current_chancellor and game_state == CHANCELLOR_LEGISLATION:
-        await ctx.send(f"The Chancellor **{current_chancellor.name}** has called a veto to this policy agenda!"
+        await game_channel.send(f"The Chancellor **{current_chancellor.name}** has called a veto to this policy agenda!"
                        f"\nThe president **{current_president.name}** must either **!veto** **Ja!** or **Nein!** to accept or block the veto.")
         game_state = AGENDA_VETOED
         return
@@ -639,11 +703,8 @@ async def veto(ctx, decision: str=None):
         if decision.lower() in ['ja', 'ja!']:
             discarded_policies.extend(top_cards)
             top_cards = []
-            next_president = get_next_player(current_president)
-            if next_president == previous_president:
-                next_president = get_next_player(next_president)
             previous_president = current_president
-            current_president = next_president
+            current_president = get_next_president()
             messageAfter = (
                 f"The President **{current_president.name}** has voted in **favor** of a veto to this policy agenda!"
                 f"\nThe policies will all be discarded and this will be considered an election failure."
@@ -652,14 +713,14 @@ async def veto(ctx, decision: str=None):
             if reshuffle_msg is not None:
                 messageAfter += f"\n\n{reshuffle_msg}"
             messageAfter += (
-                f"\n\nIt's time for a new election! **{next_president.name}** will be nominated as new President!"
-                f"\n**{next_president.name}** you must **!nominate** a Chancellor then the group will **!vote**."
+                f"\n\nIt's time for a new election! **{current_president.name}** will be nominated as new President!"
+                f"\n**{current_president.name}** you must **!nominate** a Chancellor then the group will **!vote**."
             )
-            await print_game_dashboard(ctx, None, messageAfter)
+            await print_game_dashboard(None, messageAfter)
             game_state = NOMINATE_CHANCELLOR
         if decision.lower() in ['nein', 'nein!']:
-            await ctx.send(f"The President **{current_president.name}** has voted **against** a veto of this policy agenda!"
-                        f"\nThe current chancellor {current_chancellor.name} must **!enact** a policy!.")
+            await game_channel.send(f"The President **{current_president.name}** has voted **against** a veto of this policy agenda!"
+                        f"\nThe current chancellor **{current_chancellor.name}** must **!enact** a policy!.")
             game_state = CHANCELLOR_LEGISLATION
         return
     
@@ -675,9 +736,9 @@ async def lobby(ctx):
                 message += (f"\n- {player.name}")
         else:
             message = "No players are currently in the lobby."
-        await ctx.send(message)
+        await game_channel.send(message)
     else:
-        await ctx.send("Match is in progress.")
+        await game_channel.send("Match is in progress.")
 
 @bot.command()
 @is_player()
@@ -685,7 +746,7 @@ async def lobby(ctx):
 async def reset(ctx):
     """Resets the game to allow a new round."""
     reset_game()
-    await ctx.send("The game has been reset. Players can now join a new round!")
+    await game_channel.send("The game has been reset. Players can now join a new round!")
 
 def get_player_by_name(player_name):
     # Find the player with the given name
@@ -700,16 +761,24 @@ def get_next_player(current_player):
     next_index = (current_index + 1) % len(players)
     return players[next_index]
 
-async def print_game_dashboard(ctx, msgBefore=None, msgAfter=None):
+def get_next_president():
+    global current_chancellor
+    current_chancellor = None
+    next_president = get_next_player(current_president)
+    if next_president == previous_president:
+        next_president = get_next_player(next_president)
+    return next_president
+
+async def print_game_dashboard(msgBefore=None, msgAfter=None):
     global players, assassinated, liberal_policies, fascist_policies, previous_president, policy_cards, discarded_policies
     message = (f"**Players**")
     for player in players:
         message += f"\n- {player.name}"
-        if (player == current_president):
-            message += " (President)"
-        if (player == current_chancellor):
-            message += " (Chancellor)"
-        if (player == previous_president):
+        if player == current_president:
+            message += " **(President)**"
+        if player == current_chancellor:
+            message += " **(Chancellor)**"
+        if player == previous_president and (liberal_policies + fascist_policies) > 0:
             message += " (Previous President)"
     for player in assassinated:
         message += f"\n- {player.name} (Assassinated)"
@@ -719,15 +788,15 @@ async def print_game_dashboard(ctx, msgBefore=None, msgAfter=None):
         f"\n- Discard Pile: {len(discarded_policies)}"
         )
     if msgBefore:
-        await ctx.send(msgBefore)
-    await ctx.send(message)
+        await game_channel.send(msgBefore)
+    await game_channel.send(message)
     tasks = [
-        ctx.send(file=discord.File(get_liberal_board_img_file())), 
-        ctx.send(file=discord.File(get_fascist_board_img_file()))
+        game_channel.send(file=discord.File(get_liberal_board_img_file())), 
+        game_channel.send(file=discord.File(get_fascist_board_img_file()))
         ]
     await asyncio.gather(*tasks)
     if msgAfter:
-        await ctx.send("\n**Game Updates**\n" + msgAfter)
+        await game_channel.send("\n**Game Updates**\n" + msgAfter)
 
 def get_intro_screen():
     message = (
@@ -790,7 +859,6 @@ def enact_top_policy():
     else:
         liberal_policies += 1
     
-
 async def examine_top_cards():
     global policy_cards
     card_img_file = './images/cards/top_cards'
@@ -826,10 +894,9 @@ def start_new_round():
     return message
 
 def reset_game():
-    global players, game_started, roles, role_assignments, game_state, liberal_policies, fascist_policies, policy_cards, failed_election_count, previous_president, current_president, current_chancellor
+    global players, game_started, role_assignments, game_state, liberal_policies, fascist_policies, policy_cards, failed_election_count, previous_president, current_president, current_chancellor
     players = []
     game_started = False
-    roles = []
     role_assignments = {}
     game_state = 0
     liberal_policies = 0
@@ -840,7 +907,7 @@ def reset_game():
     current_president = None
     current_chancellor = None
 
-async def game_over(ctx, msg):
+async def game_over(msg):
     global players, assassinated, role_assignments
     fascists = []
     liberals = []
@@ -872,7 +939,7 @@ async def game_over(ctx, msg):
     msg += f"\n\n**LIBERALS:**\n" + "\n".join(f"- {liberal.name} (assassinated)" if liberal in assassinated else f"- {liberal.name}" for liberal in liberals)
     
     logger.info(f"Ending Game: {msg}")
-    await ctx.send(msg)
+    await game_channel.send(msg)
     reset_game()
 
 def get_liberal_board_img_file():
@@ -880,8 +947,8 @@ def get_liberal_board_img_file():
     return f"./images/boards/liberal/liberal_board_{liberal_policies}_{failed_election_count}.jpg"
 
 def get_fascist_board_img_file():
-    global liberal_policies, game_type
-    return f"./images/boards/fascist/{game_type}/fascist_board_{fascist_policies}.jpg"
+    global liberal_policies, game_mode
+    return f"./images/boards/fascist/{game_mode}/fascist_board_{fascist_policies}.jpg"
 
 # Run the bot
 bot.run(DISCORD_TOKEN)
