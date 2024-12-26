@@ -831,23 +831,20 @@ def get_intro_screen():
 
 async def send_roles_to_players():
     global role_assignments, players
-    tasks = []
     # Send roles to players
     for player, role in role_assignments.items():
         if role == LIBERAL:
-            tasks.append(player.send(file=discord.File(LIBERAL_PARTY_CARD_IMG)))
+            await player.send(file=discord.File(LIBERAL_PARTY_CARD_IMG))
         elif role == FASCIST:
             other_fascists = [p.name for p, r in role_assignments.items() if r == FASCIST and p.name != player.name]
             hitler = [p.name for p, r in role_assignments.items() if r == HITLER]
-            tasks.append(player.send(file=discord.File(FASCIST_PARTY_CARD_IMG)))
-            tasks.append(player.send(f"Other Fascists: {', '.join(other_fascists)}\nHitler: {', '.join(hitler)}"))
+            await player.send(file=discord.File(FASCIST_PARTY_CARD_IMG))
+            await player.send(f"Other Fascists: {', '.join(other_fascists)}\nHitler: {', '.join(hitler)}")
         elif role == HITLER:
             fascists = [p.name for p, r in role_assignments.items() if r == FASCIST]
-            tasks.append(player.send(file=discord.File(HITLER_CARD_IMG)))
+            await player.send(file=discord.File(HITLER_CARD_IMG))
             if len(players) < 7:
-                tasks.append(player.send(f"Other Fascists: {', '.join(fascists)}"))
-    if tasks:
-        await asyncio.gather(*tasks)
+                await player.send(f"Other Fascists: {', '.join(fascists)}")
 
 def enact_top_policy():
     global policy_cards, fascist_policies, liberal_policies
