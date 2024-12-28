@@ -455,7 +455,8 @@ async def election_success(message):
     top_cards = policy_cards[:min(3, len(policy_cards))]
     policy_cards = policy_cards[min(3, len(policy_cards)):]
     message += (
-        f"\nThe vote **passed**! **{get_player_name(current_president)}** is your **President** and **{get_player_name(current_chancellor)}** is your **Chancellor**!"
+        f"\nThe vote **passed**!"
+        f"\n**{get_player_name(current_president)}** is your **President** and **{get_player_name(current_chancellor)}** is your **Chancellor**!"
         f"\nDrawing the top 3 policy cards and sending them to President **{get_player_name(current_president)}** for review..."
         f"\nPresident **{get_player_name(current_president)}** must **!discard** one policy before Chancellor **{get_player_name(current_chancellor)}** will **!enact** one."
         )
@@ -474,11 +475,12 @@ async def election_failed(message):
     if failed_election_count == 3:
         top_policy = policy_cards[0]
         enact_top_policy()
-        enact_top_policy_msg = f'\nThis is the 3rd failed election so the **{top_policy}** policy on the top of the draw pile has been enacted.'
+        enact_top_policy_msg = f"This is the 3rd failed election so the **{top_policy}** policy on the top of the draw pile has been **enacted**."
         failed_election_count = 0
     current_president = get_next_president()
     message += (
-        f"\nThe vote **failed**! The candidates were **not** elected. {enact_top_policy_msg}"
+        f"\nThe vote **failed**! {enact_top_policy_msg}"
+        f"Choosing new candidates..."
         f"\n**{get_player_name(current_president)}** has been chosen as the new Presidential Candidate."
         f"\n**{get_player_name(current_president)}** you must **!nominate** a Chancellor then the group will vote again."
         )
